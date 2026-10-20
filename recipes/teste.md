@@ -9,7 +9,6 @@
 | languageLocale | pt-PT |
 | deviceTypeIds | 13 |
 | servings | 2 (frasco) |
-| recipeId | 10440324 |
 | ingredientGroupName | Ingredientes gerais |
 | preparationTime | 1 |
 | readyInTime | 1 |

@@ -8,7 +8,8 @@ on:
         required: true
         default: false
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 jobs:
   publish:
     if: inputs.confirm_publish
@@ -41,10 +42,40 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
               env_file.write(f'MC_SESSION_FILE={session_path}\n')
           PY
-      - name: Publish recipes, keep failures as drafts
+      - name: Find existing recipes
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python - "$RUNNER_TEMP/account-recipes.json" <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          recipes = []
+          page = 1
+          while True:
+              result = subprocess.run(
+                  [
+                      'monsieur-cuisine-cli', '--session-file', os.environ['MC_SESSION_FILE'],
+                      'recipes', 'list', '--page', str(page), '--size', '100', '--json',
+                  ],
+                  check=True, capture_output=True, text=True,
+              )
+              data = json.loads(result.stdout)
+              recipes.extend(data.get('recipes', []))
+              if page >= int(data.get('totalPage', page)):
+                  break
+              page += 1
+          Path(sys.argv[1]).write_text(json.dumps(recipes), encoding='utf-8')
+          print(f'Loaded {len(recipes)} existing recipes for title matching.')
+          PY
+      - name: Publish recipes and prepare recipe ID PR
         env:
           RECIPE_JSON_DIR: ${{ steps.cookbook.outputs.output-directory }}
           RUNNER_TEMP: ${{ runner.temp }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -uo pipefail
@@ -56,17 +87,50 @@ jobs:
           fi
 
           failed=0
+          changed_markdowns=()
           for recipe in "${files[@]}"; do
             recipe_id_file="${recipe%.json}.id"
+            source_file="${recipe%.json}.source"
             thumbnail_file="${recipe%.json}.thumbnail"
             details_image_file="${recipe%.json}.details-image"
             result_file="$RUNNER_TEMP/recipe-result.json"
             error_file="$RUNNER_TEMP/recipe-error.txt"
             command=(monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes)
+            resolved_id=""
             if [[ -s "$recipe_id_file" ]]; then
-              recipe_id="$(cat "$recipe_id_file")"
-              echo "Updating private recipe $recipe_id from ${recipe##*/}"
-              command+=(update "$recipe_id")
+              resolved_id="$(cat "$recipe_id_file")"
+            else
+              if ! resolved_id="$(python - "$RUNNER_TEMP/account-recipes.json" "$recipe" 2>"$RUNNER_TEMP/match-error.txt" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          account = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          payload = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
+          title = payload['title'].strip().casefold()
+          locale = payload.get('languageLocale', '').strip().casefold()
+          matches = [entry for entry in account if entry.get('title', '').strip().casefold() == title]
+          same_locale = [entry for entry in matches if entry.get('languageLocale', '').strip().casefold() == locale]
+          if same_locale:
+              matches = same_locale
+          if len(matches) > 1:
+              ids = ', '.join(str(entry.get('id')) for entry in matches)
+              raise SystemExit(f'Multiple recipes match title {payload["title"]!r} (IDs: {ids}); set recipeId explicitly.')
+          if matches:
+              print(matches[0]['id'])
+          PY
+              )"; then
+                match_error="$(cat "$RUNNER_TEMP/match-error.txt")"
+                echo "Unable to match ${recipe##*/}: $match_error" >&2
+                echo "- Unable to match ${recipe##*/}: $match_error" >> "$GITHUB_STEP_SUMMARY"
+                failed=1
+                continue
+              fi
+            fi
+
+            if [[ -n "$resolved_id" ]]; then
+              echo "Updating private recipe $resolved_id from ${recipe##*/}"
+              command+=(update "$resolved_id")
             else
               echo "Creating private recipe from ${recipe##*/}"
               command+=(create)
@@ -79,14 +143,27 @@ jobs:
             fi
 
             private_command=("${command[@]}" --data "$(cat "$recipe")" --json)
+            saved_id="$resolved_id"
             if "${private_command[@]}" >"$result_file" 2>"$error_file"; then
               cat "$result_file"
-              continue
-            fi
+              if [[ -z "$saved_id" ]]; then
+                saved_id="$(python - "$result_file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
 
-            private_error="$(tr '\n' ' ' <"$error_file" | sed 's/[[:space:]]\+/ /g; s/[[:space:]]*$//')"
-            draft_file="$RUNNER_TEMP/recipe-draft.json"
-            python - "$recipe" "$draft_file" <<'PY'
+          result = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if isinstance(result, dict) and isinstance(result.get('recipe'), dict):
+              result = result['recipe']
+          if isinstance(result, dict):
+              print(result.get('id') or result.get('recipeId') or '')
+          PY
+                )"
+              fi
+            else
+              private_error="$(tr '\n' ' ' <"$error_file" | sed 's/[[:space:]]\+/ /g; s/[[:space:]]*$//')"
+              draft_file="$RUNNER_TEMP/recipe-draft.json"
+              python - "$recipe" "$draft_file" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -98,6 +175,20 @@ jobs:
             draft_command=("${command[@]}" --data "$(cat "$draft_file")" --json)
             if "${draft_command[@]}" >"$result_file" 2>"$error_file"; then
               cat "$result_file"
+              if [[ -z "$saved_id" ]]; then
+                saved_id="$(python - "$result_file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          result = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if isinstance(result, dict) and isinstance(result.get('recipe'), dict):
+              result = result['recipe']
+          if isinstance(result, dict):
+              print(result.get('id') or result.get('recipeId') or '')
+          PY
+                )"
+              fi
               message="Unable to publish recipe ${recipe##*/}; it remains in draft. Publish error: ${private_error:-unknown error}"
             else
               draft_error="$(tr '\n' ' ' <"$error_file" | sed 's/[[:space:]]\+/ /g; s/[[:space:]]*$//')"
@@ -106,5 +197,65 @@ jobs:
             echo "$message" >&2
             echo "- $message" >> "$GITHUB_STEP_SUMMARY"
             failed=1
+            fi
+
+            if [[ -z "$saved_id" ]]; then
+              echo "Recipe ${recipe##*/} was saved but the API response did not include an ID; no recipe ID PR can be prepared." >&2
+              failed=1
+              continue
+            fi
+            source_path="$(cat "$source_file")"
+            update_result="$(python - "$source_path" "$saved_id" "$recipe" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          source = Path(sys.argv[1])
+          recipe_id = sys.argv[2]
+          payload = json.loads(Path(sys.argv[3]).read_text(encoding='utf-8'))
+          locale = payload.get('languageLocale', 'pt-PT').replace('_', '-').lower()
+          url = f'https://www.monsieur-cuisine.com/{locale}/previsao-da-receita?recipe-id={recipe_id}'
+          replacement = f'| recipeId | [{url}]({url}) |'
+          lines = source.read_text(encoding='utf-8').splitlines()
+          recipe_heading = next((i for i, line in enumerate(lines) if re.match(r'^##\s+Recipe\s*$', line, re.I)), None)
+          if recipe_heading is None:
+              raise SystemExit(f'{source} has no ## Recipe table')
+          table_end = next((i for i in range(recipe_heading + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
+          id_row = next((i for i in range(recipe_heading + 1, table_end) if re.match(r'^\s*\|\s*recipeId\s*\|', lines[i], re.I)), None)
+          if id_row is not None:
+              if lines[id_row] == replacement:
+                  print('unchanged')
+              else:
+                  lines[id_row] = replacement
+                  source.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+                  print('changed')
+          else:
+              separator = next((i for i in range(recipe_heading + 1, table_end) if re.match(r'^\s*\|\s*:?-{3,}', lines[i])), None)
+              if separator is None:
+                  raise SystemExit(f'{source} has no Markdown table separator under ## Recipe')
+              lines.insert(separator + 1, replacement)
+              source.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+              print('changed')
+          PY
+            )"
+            if [[ "$update_result" == changed ]]; then
+              changed_markdowns+=("$source_path")
+            fi
           done
+
+          if ((${#changed_markdowns[@]})); then
+            branch="recipe-ids/${GITHUB_RUN_ID}"
+            git switch -c "$branch"
+            git add -- "${changed_markdowns[@]}"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Record Monsieur Cuisine recipe IDs"
+            git push origin "$branch"
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "Record recipe IDs after publishing" \
+              --body "Adds Monsieur Cuisine recipe links to the recipe metadata tables. Recipes without an ID are matched by exact title (and locale when available) before this run creates anything."
+          fi
           exit "$failed"
