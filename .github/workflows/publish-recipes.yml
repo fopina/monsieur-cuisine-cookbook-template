@@ -1,0 +1,56 @@
+name: Publish recipe drafts
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: Create draft recipes from every Markdown file under recipes/
+        type: boolean
+        required: true
+        default: false
+jobs:
+  publish:
+    if: inputs.confirm_publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: fopina/monsieur-cuisine-cli/action@github-action-cookbook
+        id: cookbook
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Monsieur Cuisine CLI
+        run: python -m pip install --disable-pip-version-check monsieur-cuisine-cli
+      - name: Prepare temporary session file
+        env:
+          MC_API_ACCESS_TOKEN: ${{ secrets.MC_API_ACCESS_TOKEN }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          token = os.environ.get('MC_API_ACCESS_TOKEN')
+          if not token:
+              raise SystemExit('Repository secret MC_API_ACCESS_TOKEN is not configured.')
+          session_path = Path(os.environ['RUNNER_TEMP']) / 'mc-session.json'
+          session_path.write_text(json.dumps({'accessToken': token}), encoding='utf-8')
+          session_path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
+              env_file.write(f'MC_SESSION_FILE={session_path}\n')
+          PY
+      - name: Create recipe drafts
+        env:
+          RECIPE_JSON_DIR: ${{ steps.cookbook.outputs.output-directory }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=("$RECIPE_JSON_DIR"/*.json)
+          if ((${#files[@]} == 0)); then
+            echo "No converted recipe JSON files found."
+            exit 1
+          fi
+          for recipe in "${files[@]}"; do
+            echo "Creating draft from ${recipe##*/}"
+            monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes create --data "$(cat "$recipe")"
+          done
