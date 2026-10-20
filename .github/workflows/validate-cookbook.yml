@@ -1,0 +1,16 @@
+name: Validate cookbook
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  recipes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: fopina/monsieur-cuisine-cli@github-action-cookbook
+        id: cookbook
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recipe-json
+          path: ${{ steps.cookbook.outputs.output-directory }}
