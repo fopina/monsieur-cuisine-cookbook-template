@@ -3,6 +3,7 @@ title = "Tomato soup"
 languageLocale = "en-US"
 deviceTypeIds = [13]
 servings = 4
+recipeId = 10441064
 preparationTime = 10
 readyInTime = 35
 description = "A simple weeknight soup."

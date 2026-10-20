@@ -51,6 +51,13 @@ jobs:
             exit 1
           fi
           for recipe in "${files[@]}"; do
-            echo "Creating draft from ${recipe##*/}"
-            monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes create --data "$(cat "$recipe")"
+            recipe_id_file="${recipe%.json}.id"
+            if [[ -s "$recipe_id_file" ]]; then
+              recipe_id="$(cat "$recipe_id_file")"
+              echo "Updating recipe $recipe_id from ${recipe##*/}"
+              monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes update "$recipe_id" --data "$(cat "$recipe")"
+            else
+              echo "Creating draft from ${recipe##*/}"
+              monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes create --data "$(cat "$recipe")"
+            fi
           done
