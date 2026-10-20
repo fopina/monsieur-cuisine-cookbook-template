@@ -52,8 +52,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$GH_SECRETS_WRITE_TOKEN" ]]; then
-            echo "Repository secret GH_SECRETS_WRITE_TOKEN is required; use a fine-grained PAT limited to this repository with Actions secrets: write." >&2
-            exit 1
+            echo "GH_SECRETS_WRITE_TOKEN is not configured; skipping token rotation. The current MC_API_ACCESS_TOKEN must still be valid." >&2
+            exit 0
           fi
           monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" auth renew
           token="$(python -c 'import json, os; print(json.load(open(os.environ["MC_SESSION_FILE"]))["accessToken"])')"
@@ -282,6 +282,10 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [[ -z "$GH_SECRETS_WRITE_TOKEN" ]]; then
+            echo "GH_SECRETS_WRITE_TOKEN is not configured; skipping token persistence." >&2
+            exit 0
+          fi
           token="$(python -c 'import json, os; print(json.load(open(os.environ["MC_SESSION_FILE"]))["accessToken"])')"
           current_hash="$(printf '%s' "$token" | sha256sum | cut -d ' ' -f 1)"
           if [[ "$current_hash" != "$(cat "$RUNNER_TEMP/mc-token-hash")" ]]; then
