@@ -39,7 +39,7 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
               env_file.write(f'MC_SESSION_FILE={session_path}\n')
           PY
-      - name: Create recipe drafts
+      - name: Create or update recipe drafts
         env:
           RECIPE_JSON_DIR: ${{ steps.cookbook.outputs.output-directory }}
         shell: bash
@@ -52,12 +52,23 @@ jobs:
           fi
           for recipe in "${files[@]}"; do
             recipe_id_file="${recipe%.json}.id"
+            thumbnail_file="${recipe%.json}.thumbnail"
+            details_image_file="${recipe%.json}.details-image"
+            command=(monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes)
             if [[ -s "$recipe_id_file" ]]; then
               recipe_id="$(cat "$recipe_id_file")"
               echo "Updating recipe $recipe_id from ${recipe##*/}"
-              monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes update "$recipe_id" --data "$(cat "$recipe")"
+              command+=(update "$recipe_id")
             else
               echo "Creating draft from ${recipe##*/}"
-              monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes create --data "$(cat "$recipe")"
+              command+=(create)
             fi
+            command+=(--data "$(cat "$recipe")")
+            if [[ -s "$thumbnail_file" ]]; then
+              command+=(--thumbnail "$(cat "$thumbnail_file")")
+            fi
+            if [[ -s "$details_image_file" ]]; then
+              command+=(--details-image "$(cat "$details_image_file")")
+            fi
+            "${command[@]}"
           done
