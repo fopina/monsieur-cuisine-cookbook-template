@@ -1,5 +1,7 @@
 # Tomato soup
 
+A simple weeknight soup.
+
 ## Recipe
 
 | Field | Value |
@@ -10,7 +12,6 @@
 | recipeId | 10441064 |
 | preparationTime | 10 |
 | readyInTime | 35 |
-| description | A simple weeknight soup. |
 
 ## Ingredients
 

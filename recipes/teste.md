@@ -1,5 +1,7 @@
 # teste
 
+![Imagem principal da receita](images/10440324-thumbnail.png)
+
 ## Recipe
 
 | Field | Value |
@@ -13,10 +15,7 @@
 | readyInTime | 1 |
 | categoryIds | 271 |
 | complexityId | 203 |
-| thumbnail | images/10440324-thumbnail.png |
 | detailsImage | images/10440324-details.png |
-
-![Imagem principal da receita](images/10440324-thumbnail.png)
 
 ## Nutrition
 
