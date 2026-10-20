@@ -1,12 +1,14 @@
-name: Publish recipe drafts
+name: Publish recipes
 on:
   workflow_dispatch:
     inputs:
       confirm_publish:
-        description: Create draft recipes from every Markdown file under recipes/
+        description: Publish every Markdown recipe as private
         type: boolean
         required: true
         default: false
+permissions:
+  contents: read
 jobs:
   publish:
     if: inputs.confirm_publish
@@ -39,36 +41,70 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
               env_file.write(f'MC_SESSION_FILE={session_path}\n')
           PY
-      - name: Create or update recipe drafts
+      - name: Publish recipes, keep failures as drafts
         env:
           RECIPE_JSON_DIR: ${{ steps.cookbook.outputs.output-directory }}
+          RUNNER_TEMP: ${{ runner.temp }}
         shell: bash
         run: |
+          set -uo pipefail
           shopt -s nullglob
           files=("$RECIPE_JSON_DIR"/*.json)
           if ((${#files[@]} == 0)); then
             echo "No converted recipe JSON files found."
             exit 1
           fi
+
+          failed=0
           for recipe in "${files[@]}"; do
             recipe_id_file="${recipe%.json}.id"
             thumbnail_file="${recipe%.json}.thumbnail"
             details_image_file="${recipe%.json}.details-image"
+            result_file="$RUNNER_TEMP/recipe-result.json"
+            error_file="$RUNNER_TEMP/recipe-error.txt"
             command=(monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" recipes)
             if [[ -s "$recipe_id_file" ]]; then
               recipe_id="$(cat "$recipe_id_file")"
-              echo "Updating recipe $recipe_id from ${recipe##*/}"
+              echo "Updating private recipe $recipe_id from ${recipe##*/}"
               command+=(update "$recipe_id")
             else
-              echo "Creating draft from ${recipe##*/}"
+              echo "Creating private recipe from ${recipe##*/}"
               command+=(create)
             fi
-            command+=(--data "$(cat "$recipe")")
             if [[ -s "$thumbnail_file" ]]; then
               command+=(--thumbnail "$(cat "$thumbnail_file")")
             fi
             if [[ -s "$details_image_file" ]]; then
               command+=(--details-image "$(cat "$details_image_file")")
             fi
-            "${command[@]}"
+
+            private_command=("${command[@]}" --data "$(cat "$recipe")" --json)
+            if "${private_command[@]}" >"$result_file" 2>"$error_file"; then
+              cat "$result_file"
+              continue
+            fi
+
+            private_error="$(tr '\n' ' ' <"$error_file" | sed 's/[[:space:]]\+/ /g; s/[[:space:]]*$//')"
+            draft_file="$RUNNER_TEMP/recipe-draft.json"
+            python - "$recipe" "$draft_file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          payload['status'] = 'draft'
+          Path(sys.argv[2]).write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+          PY
+            draft_command=("${command[@]}" --data "$(cat "$draft_file")" --json)
+            if "${draft_command[@]}" >"$result_file" 2>"$error_file"; then
+              cat "$result_file"
+              message="Unable to publish recipe ${recipe##*/}; it remains in draft. Publish error: ${private_error:-unknown error}"
+            else
+              draft_error="$(tr '\n' ' ' <"$error_file" | sed 's/[[:space:]]\+/ /g; s/[[:space:]]*$//')"
+              message="Unable to publish recipe ${recipe##*/}, and draft fallback also failed. Publish error: ${private_error:-unknown error}. Draft error: ${draft_error:-unknown error}"
+            fi
+            echo "$message" >&2
+            echo "- $message" >> "$GITHUB_STEP_SUMMARY"
+            failed=1
           done
+          exit "$failed"
