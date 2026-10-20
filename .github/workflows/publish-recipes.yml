@@ -42,6 +42,23 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
               env_file.write(f'MC_SESSION_FILE={session_path}\n')
           PY
+      - name: Refresh and save Monsieur Cuisine token
+        id: refresh_token
+        env:
+          GH_SECRETS_WRITE_TOKEN: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
+          MC_SESSION_FILE: ${{ env.MC_SESSION_FILE }}
+          RUNNER_TEMP: ${{ runner.temp }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_SECRETS_WRITE_TOKEN" ]]; then
+            echo "Repository secret GH_SECRETS_WRITE_TOKEN is required; use a fine-grained PAT limited to this repository with Actions secrets: write." >&2
+            exit 1
+          fi
+          monsieur-cuisine-cli --session-file "$MC_SESSION_FILE" auth renew
+          token="$(python -c 'import json, os; print(json.load(open(os.environ["MC_SESSION_FILE"]))["accessToken"])')"
+          printf '%s' "$token" | GH_TOKEN="$GH_SECRETS_WRITE_TOKEN" gh secret set MC_API_ACCESS_TOKEN --repo "$GITHUB_REPOSITORY"
+          printf '%s' "$token" | sha256sum | cut -d ' ' -f 1 > "$RUNNER_TEMP/mc-token-hash"
       - name: Find existing recipes
         env:
           RUNNER_TEMP: ${{ runner.temp }}
@@ -49,21 +66,18 @@ jobs:
           python - "$RUNNER_TEMP/account-recipes.json" <<'PY'
           import json
           import os
-          import subprocess
           import sys
           from pathlib import Path
+          from monsieur_cuisine_cli.api.recipes import list_my_recipes
 
           recipes = []
           page = 1
           while True:
-              result = subprocess.run(
-                  [
-                      'monsieur-cuisine-cli', '--session-file', os.environ['MC_SESSION_FILE'],
-                      'recipes', 'list', '--page', str(page), '--size', '100', '--json',
-                  ],
-                  check=True, capture_output=True, text=True,
+              data = list_my_recipes(
+                  page, 100, session_file=os.environ['MC_SESSION_FILE']
               )
-              data = json.loads(result.stdout)
+              if not isinstance(data, dict):
+                  raise SystemExit(f'Recipe list returned an unexpected response for page {page}.')
               recipes.extend(data.get('recipes', []))
               if page >= int(data.get('totalPage', page)):
                   break
@@ -259,3 +273,17 @@ jobs:
               --body "Adds Monsieur Cuisine recipe links to the recipe metadata tables. Recipes without an ID are matched by exact title (and locale when available) before this run creates anything."
           fi
           exit "$failed"
+      - name: Save token if the CLI refreshed it during publishing
+        if: always() && steps.refresh_token.outcome == 'success'
+        env:
+          GH_SECRETS_WRITE_TOKEN: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
+          MC_SESSION_FILE: ${{ env.MC_SESSION_FILE }}
+          RUNNER_TEMP: ${{ runner.temp }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          token="$(python -c 'import json, os; print(json.load(open(os.environ["MC_SESSION_FILE"]))["accessToken"])')"
+          current_hash="$(printf '%s' "$token" | sha256sum | cut -d ' ' -f 1)"
+          if [[ "$current_hash" != "$(cat "$RUNNER_TEMP/mc-token-hash")" ]]; then
+            printf '%s' "$token" | GH_TOKEN="$GH_SECRETS_WRITE_TOKEN" gh secret set MC_API_ACCESS_TOKEN --repo "$GITHUB_REPOSITORY"
+          fi
