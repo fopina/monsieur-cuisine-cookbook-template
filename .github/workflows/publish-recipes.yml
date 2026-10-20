@@ -84,6 +84,8 @@ jobs:
               page += 1
           Path(sys.argv[1]).write_text(json.dumps(recipes), encoding='utf-8')
           print(f'Loaded {len(recipes)} existing recipes for title matching.')
+          for recipe in recipes:
+              print(f'  id={recipe.get("id")} title={recipe.get("title")!r} locale={recipe.get("languageLocale")!r} status={recipe.get("status")!r}')
           PY
       - name: Publish recipes and prepare recipe ID PR
         env:
@@ -166,7 +168,12 @@ jobs:
           import sys
           from pathlib import Path
 
-          result = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          raw = Path(sys.argv[1]).read_text(encoding='utf-8')
+          decoder = json.JSONDecoder()
+          start = raw.find('{')
+          if start < 0:
+              raise SystemExit('CLI response did not contain a JSON object.')
+          result, _ = decoder.raw_decode(raw[start:])
           if isinstance(result, dict) and isinstance(result.get('recipe'), dict):
               result = result['recipe']
           if isinstance(result, dict):
@@ -195,7 +202,12 @@ jobs:
           import sys
           from pathlib import Path
 
-          result = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          raw = Path(sys.argv[1]).read_text(encoding='utf-8')
+          decoder = json.JSONDecoder()
+          start = raw.find('{')
+          if start < 0:
+              raise SystemExit('CLI response did not contain a JSON object.')
+          result, _ = decoder.raw_decode(raw[start:])
           if isinstance(result, dict) and isinstance(result.get('recipe'), dict):
               result = result['recipe']
           if isinstance(result, dict):

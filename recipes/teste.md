@@ -14,6 +14,7 @@
 | readyInTime | 1 |
 | categoryIds | 271 |
 | complexityId | 203 |
+| recipeId | [https://www.monsieur-cuisine.com/pt-pt/previsao-da-receita?recipe-id=10440324](https://www.monsieur-cuisine.com/pt-pt/previsao-da-receita?recipe-id=10440324) |
 
 ## Nutrition
 
