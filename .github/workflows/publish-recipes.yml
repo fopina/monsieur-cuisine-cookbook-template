@@ -2,25 +2,89 @@ name: Publish recipes
 on:
   push:
     branches: [main]
+    paths:
+      - 'recipes/**/*.md'
   workflow_dispatch:
     inputs:
       confirm_publish:
-        description: Publish every Markdown recipe as private
+        description: Publish changed Markdown recipes as private
         type: boolean
         required: true
         default: false
+      base_sha:
+        description: Compare against this commit (defaults to the previous commit)
+        type: string
+        required: false
 permissions:
   contents: write
   pull-requests: write
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      recipe_files: ${{ steps.changed.outputs.recipe_files }}
+      has_recipes: ${{ steps.changed.outputs.has_recipes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changed
+        name: Find changed recipe Markdown files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          MANUAL_BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path, PurePosixPath
+
+          event = os.environ['EVENT_NAME']
+          head = os.environ['HEAD_SHA']
+          if event == 'push':
+              before = os.environ.get('BEFORE_SHA', '')
+              if before and set(before) != {'0'}:
+                  command = ['git', 'diff', '--name-only', '--diff-filter=ACMR', '-z', before, head]
+              else:
+                  command = ['git', 'diff-tree', '--root', '--no-commit-id', '--name-only', '--diff-filter=ACMR', '-r', '-z', head]
+          else:
+              base = os.environ.get('MANUAL_BASE_SHA', '')
+              if not base:
+                  parent = subprocess.run(['git', 'rev-parse', f'{head}^'], capture_output=True, text=True)
+                  if parent.returncode:
+                      raise SystemExit('Set base_sha when dispatching from the first commit.')
+                  base = parent.stdout.strip()
+              command = ['git', 'diff', '--name-only', '--diff-filter=ACMR', '-z', base, head]
+
+          changed = subprocess.run(command, check=True, capture_output=True).stdout.split(b'\0')
+          paths = sorted({
+              path
+              for raw in changed
+              if raw
+              for path in [os.fsdecode(raw)]
+              if PurePosixPath(path).parts[:1] == ('recipes',)
+              and PurePosixPath(path).suffix == '.md'
+              and Path(path).is_file()
+          })
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'recipe_files={json.dumps(paths)}\n')
+              output.write(f'has_recipes={"true" if paths else "false"}\n')
+          print(f'Found {len(paths)} changed recipe Markdown file(s).')
+          PY
+
   publish:
-    if: ${{ github.event_name == 'push' || inputs.confirm_publish }}
+    needs: changes
+    if: needs.changes.outputs.has_recipes == 'true' && (github.event_name == 'push' || (github.ref == 'refs/heads/main' && inputs.confirm_publish))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: fopina/monsieur-cuisine-cli@main
         with:
           operation: publish
+          recipe_files: ${{ needs.changes.outputs.recipe_files }}
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
