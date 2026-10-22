@@ -35,26 +35,20 @@ jobs:
           set -euo pipefail
 
           if [[ "$EVENT_NAME" == push ]]; then
-            mapfile -d '' recipe_paths < <(
-              git diff --name-only --diff-filter=ACMR -z \
-                "$BEFORE_SHA" "$HEAD_SHA" -- ':(glob)recipes/**/*.md'
-            )
-            label=changed
+            recipe_paths=$(git diff --name-only --diff-filter=ACMR \
+              "$BEFORE_SHA" "$HEAD_SHA" -- ':(glob)recipes/**/*.md')
           else
-            mapfile -d '' recipe_paths < <(
-              git ls-files -z -- ':(glob)recipes/**/*.md'
-            )
-            label=available
+            recipe_paths=$(git ls-files -- ':(glob)recipes/**/*.md')
           fi
 
-          recipe_files=$(jq -cn --args '$ARGS.positional' "${recipe_paths[@]}")
+          recipe_files=$(printf '%s\n' "$recipe_paths" | jq -Rsc 'split("\n") | map(select(length > 0))')
           echo "recipe_files=$recipe_files" >> "$GITHUB_OUTPUT"
-          if ((${#recipe_paths[@]})); then
-            echo 'has_recipes=true' >> "$GITHUB_OUTPUT"
-          else
+          if [[ "$recipe_files" == '[]' ]]; then
             echo 'has_recipes=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_recipes=true' >> "$GITHUB_OUTPUT"
           fi
-          echo "Found ${#recipe_paths[@]} $label recipe Markdown file(s)."
+          echo "Found $(jq 'length' <<< "$recipe_files") recipe Markdown file(s)."
 
   publish:
     needs: changes
