@@ -25,20 +25,15 @@ jobs:
           operation: get
           recipe: ${{ inputs.recipe_url }}
           output: build/recipe
+          markdown_output: recipes
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
-      - id: markdown
-        name: Create Markdown recipe
-        shell: bash
-        env:
-          RECIPE_JSON: ${{ steps.recipe.outputs.output-directory }}/recipe.json
-          INPUT_RECIPE: ${{ inputs.recipe_url }}
-        run: python scripts/recipe_json_to_markdown.py
       - name: Create pull request from main
         if: github.ref == 'refs/heads/main'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: import-recipe/${{ github.run_id }}
+          base: main
           commit-message: Import recipe from Monsieur Cuisine
           title: Import recipe from Monsieur Cuisine
           body: Add the recipe fetched by the Get recipe workflow.
@@ -46,7 +41,7 @@ jobs:
         if: github.ref != 'refs/heads/main'
         shell: bash
         env:
-          RECIPE_FILE: ${{ steps.markdown.outputs.recipe-file }}
+          RECIPE_FILE: ${{ steps.recipe.outputs.markdown-file }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
