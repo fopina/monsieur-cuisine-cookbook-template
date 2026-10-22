@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: fopina/monsieur-cuisine-cli@cookbook-recipe-fetch
+      - uses: fopina/monsieur-cuisine-cli@main
         id: cookbook
         with:
           operation: validate
