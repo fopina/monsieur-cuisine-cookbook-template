@@ -2,6 +2,8 @@ name: Publish recipes
 on:
   push:
     branches: [main]
+    paths:
+      - 'recipes/**/*.md'
   workflow_dispatch:
     inputs:
       confirm_publish:
@@ -13,14 +15,51 @@ permissions:
   contents: write
   pull-requests: write
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      recipe_files: ${{ steps.changed.outputs.recipe_files }}
+      has_recipes: ${{ steps.changed.outputs.has_recipes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changed
+        name: Find changed recipe Markdown files
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == push ]]; then
+            recipe_paths=$(git diff --name-only --diff-filter=ACMR \
+              "$BEFORE_SHA" "$HEAD_SHA" -- ':(glob)recipes/**/*.md')
+          else
+            recipe_paths=$(git ls-files -- ':(glob)recipes/**/*.md')
+          fi
+
+          recipe_files=$(printf '%s\n' "$recipe_paths" | jq -Rsc 'split("\n") | map(select(length > 0))')
+          echo "recipe_files=$recipe_files" >> "$GITHUB_OUTPUT"
+          if [[ "$recipe_files" == '[]' ]]; then
+            echo 'has_recipes=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_recipes=true' >> "$GITHUB_OUTPUT"
+          fi
+          echo "Found $(jq 'length' <<< "$recipe_files") recipe Markdown file(s)."
+
   publish:
-    if: ${{ github.event_name == 'push' || inputs.confirm_publish }}
+    needs: changes
+    if: needs.changes.outputs.has_recipes == 'true' && (github.event_name == 'push' || (github.ref == 'refs/heads/main' && inputs.confirm_publish))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: fopina/monsieur-cuisine-cli@main
         with:
           operation: publish
+          recipe_files: ${{ needs.changes.outputs.recipe_files }}
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}

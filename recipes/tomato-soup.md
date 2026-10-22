@@ -8,7 +8,7 @@ A simple weeknight soup.
 | --- | --- |
 | languageLocale | en-US |
 | deviceTypeIds | 13 |
-| servings | 4 (bowls) |
+| servings | 4 (servings) |
 | recipeId | 10441064 |
 | preparationTime | 10 |
 | readyInTime | 35 |
