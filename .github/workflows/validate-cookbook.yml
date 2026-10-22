@@ -8,8 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: fopina/monsieur-cuisine-cli@github-action-cookbook
+      - uses: fopina/monsieur-cuisine-cli@cookbook-recipe-fetch
         id: cookbook
+        with:
+          operation: validate
       - uses: actions/upload-artifact@v4
         with:
           name: recipe-json
