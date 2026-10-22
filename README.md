@@ -10,7 +10,7 @@ Every push and pull request validates the recipes and uploads the converted JSON
 
 ## Fetch a recipe
 
-Run the **Get recipe** workflow from the Actions tab, enter a Monsieur Cuisine recipe URL or numeric recipe ID, then download the `recipe-json` artifact from the completed run. The workflow uses the `MC_API_ACCESS_TOKEN` repository secret described below.
+Run the **Get recipe** workflow from the Actions tab and enter a Monsieur Cuisine recipe URL or numeric recipe ID. It fetches the recipe with the CLI and writes it as a Markdown file. When run on `main`, it opens a pull request; when run on another branch, it commits the new file directly to that branch. The workflow uses the `MC_API_ACCESS_TOKEN` repository secret described below.
 
 ## Publish recipes
 
