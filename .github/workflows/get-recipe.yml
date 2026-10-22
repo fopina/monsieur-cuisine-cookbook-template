@@ -1,0 +1,28 @@
+name: Get recipe
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipe_url:
+        description: Monsieur Cuisine recipe URL or recipe ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  get-recipe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: recipe
+        uses: fopina/monsieur-cuisine-cli@main
+        with:
+          operation: get
+          recipe: ${{ inputs.recipe_url }}
+          session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recipe-json
+          path: ${{ steps.recipe.outputs.output-directory }}

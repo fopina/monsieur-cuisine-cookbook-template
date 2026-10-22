@@ -8,6 +8,10 @@ Create a Markdown file under `recipes/`. Use the first-level heading as its titl
 
 Every push and pull request validates the recipes and uploads the converted JSON as a workflow artifact. Generated payloads use the API’s `status: private-publish` for private recipes. Review them before using the CLI to create recipes in your account.
 
+## Fetch a recipe
+
+Run the **Get recipe** workflow from the Actions tab, enter a Monsieur Cuisine recipe URL or numeric recipe ID, then download the `recipe-json` artifact from the completed run. The workflow uses the `MC_API_ACCESS_TOKEN` repository secret described below.
+
 ## Publish recipes
 
 The **Publish recipes** workflow publishes only Markdown files changed under `recipes/` on pushes to `main`. Configure the repository Actions secrets described below before merging recipe changes. For a manual run on `main`, enable `confirm_publish`; it compares the current commit with its parent by default, or with the commit provided in `base_sha`.
