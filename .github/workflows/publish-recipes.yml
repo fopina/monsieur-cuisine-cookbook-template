@@ -7,14 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       confirm_publish:
-        description: Publish changed Markdown recipes as private
+        description: Publish every Markdown recipe as private
         type: boolean
         required: true
         default: false
-      base_sha:
-        description: Compare against this commit (defaults to the previous commit)
-        type: string
-        required: false
 permissions:
   contents: write
   pull-requests: write
@@ -33,7 +29,6 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
-          MANUAL_BASE_SHA: ${{ inputs.base_sha }}
           HEAD_SHA: ${{ github.sha }}
         run: |
           python - <<'PY'
@@ -46,20 +41,10 @@ jobs:
           head = os.environ['HEAD_SHA']
           if event == 'push':
               before = os.environ.get('BEFORE_SHA', '')
-              if before and set(before) != {'0'}:
-                  command = ['git', 'diff', '--name-only', '--diff-filter=ACMR', '-z', before, head]
-              else:
-                  command = ['git', 'diff-tree', '--root', '--no-commit-id', '--name-only', '--diff-filter=ACMR', '-r', '-z', head]
+              command = ['git', 'diff', '--name-only', '--diff-filter=ACMR', '-z', before, head, '--', 'recipes']
+              changed = subprocess.run(command, check=True, capture_output=True).stdout.split(b'\0')
           else:
-              base = os.environ.get('MANUAL_BASE_SHA', '')
-              if not base:
-                  parent = subprocess.run(['git', 'rev-parse', f'{head}^'], capture_output=True, text=True)
-                  if parent.returncode:
-                      raise SystemExit('Set base_sha when dispatching from the first commit.')
-                  base = parent.stdout.strip()
-              command = ['git', 'diff', '--name-only', '--diff-filter=ACMR', '-z', base, head]
-
-          changed = subprocess.run(command, check=True, capture_output=True).stdout.split(b'\0')
+              changed = subprocess.run(['git', 'ls-files', '-z', '--', 'recipes'], check=True, capture_output=True).stdout.split(b'\0')
           paths = sorted({
               path
               for raw in changed
@@ -72,7 +57,8 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write(f'recipe_files={json.dumps(paths)}\n')
               output.write(f'has_recipes={"true" if paths else "false"}\n')
-          print(f'Found {len(paths)} changed recipe Markdown file(s).')
+          label = 'changed' if event == 'push' else 'available'
+          print(f'Found {len(paths)} {label} recipe Markdown file(s).')
           PY
 
   publish:

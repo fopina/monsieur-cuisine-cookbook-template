@@ -14,7 +14,7 @@ Run the **Get recipe** workflow from the Actions tab, enter a Monsieur Cuisine r
 
 ## Publish recipes
 
-The **Publish recipes** workflow publishes only Markdown files changed under `recipes/` on pushes to `main`. Configure the repository Actions secrets described below before merging recipe changes. For a manual run on `main`, enable `confirm_publish`; it compares the current commit with its parent by default, or with the commit provided in `base_sha`.
+The **Publish recipes** workflow publishes only Markdown files changed under `recipes/` on pushes to `main`. Configure the repository Actions secrets described below before merging recipe changes. For a manual run on `main`, enable `confirm_publish` to publish every Markdown recipe under `recipes/`.
 
 ### Use a dedicated Monsieur Cuisine API token
 
