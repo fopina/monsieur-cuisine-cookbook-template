@@ -2,6 +2,8 @@
 
 A simple weeknight soup.
 
+![A bowl of tomato soup topped with cream and fresh basil](images/tomato-soup.png)
+
 ## Recipe
 
 | Field | Value |
