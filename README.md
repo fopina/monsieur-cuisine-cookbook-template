@@ -31,6 +31,8 @@ The workflow uses two separate tokens for GitHub operations:
 - `GH_SECRETS_WRITE_TOKEN` updates the rotated `MC_API_ACCESS_TOKEN` repository secret.
 - `GH_PULL_REQUESTS_TOKEN` opens the `recipeId` pull request. The workflow's `GITHUB_TOKEN` pushes its branch (using the workflow's `Contents: write` permission), but this repository does not allow that token to create pull requests.
 
+The repository-level setting that controls pull requests from `GITHUB_TOKEN` is **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. When this is disabled, `GITHUB_TOKEN` cannot create PRs even when the workflow declares `pull-requests: write`; the run fails with “GitHub Actions is not permitted to create or approve pull requests.” The current workflow avoids changing that policy by using `GH_PULL_REQUESTS_TOKEN`. If you prefer to use only `GITHUB_TOKEN`, enable the setting and change the action's `github_token` input to `${{ secrets.GITHUB_TOKEN }}`; then `GH_PULL_REQUESTS_TOKEN` is not needed.
+
 Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) for each token:
 
 1. Open [GitHub’s fine-grained token creation page](https://github.com/settings/personal-access-tokens/new) (or navigate through **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**).
