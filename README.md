@@ -28,17 +28,25 @@ monsieur-cuisine-cli --session-file github-cookbook-session.json auth login
 
 By default, this saves `github-cookbook-session.json` beside the CLI config file (normally `~/.config/monsieur-cuisine/`). Copy the `accessToken` value from that session file into the cookbook repository's `MC_API_ACCESS_TOKEN` Actions secret. Keep this session dedicated to GitHub Actions; do not use it for routine CLI work or manually renew it. The workflow refreshes the token and writes the rotated value back to `MC_API_ACCESS_TOKEN` after each run.
 
-### Create the secret-writing PAT
+### GitHub Actions permissions
 
-The workflow also needs a GitHub token that can replace `MC_API_ACCESS_TOKEN`. Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens):
+The workflow grants the built-in `GITHUB_TOKEN` `Contents: write` and `Pull requests: write` so it can push the recipe-ID branch and open the `recipeId` pull request.
+
+For `GITHUB_TOKEN` to open pull requests, enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** in this repository. Without that repository-level setting, the workflow fails with “GitHub Actions is not permitted to create or approve pull requests,” even though `pull-requests: write` is declared.
+
+### Secret-writing token
+
+The workflow also needs a token with permission to update the rotated `MC_API_ACCESS_TOKEN` repository secret. It uses `GH_SECRETS_WRITE_TOKEN` for this operation.
+
+Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) for `GH_SECRETS_WRITE_TOKEN`:
 
 1. Open [GitHub’s fine-grained token creation page](https://github.com/settings/personal-access-tokens/new) (or navigate through **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**).
 2. Select the account that owns the cookbook storage repository as **Resource owner**.
 3. Under **Repository access**, choose **Only select repositories**, then select the cookbook repository used to store the Markdown recipes.
-4. Under **Repository permissions**, set **Secrets** to **Read and write**. Leave other permissions at their defaults.
+4. Under **Repository permissions**, set **Secrets** to **Read and write**.
 5. Choose an expiration that fits your maintenance schedule, generate the token, and copy it.
-6. In that cookbook repository, open **Settings → Secrets and variables → Actions → New repository secret**. Save the token as `GH_SECRETS_WRITE_TOKEN`.
+6. In that cookbook repository, open **Settings → Secrets and variables → Actions → New repository secret** and save it as `GH_SECRETS_WRITE_TOKEN`.
 
-GitHub's [Actions secrets API documentation](https://docs.github.com/en/rest/actions/secrets#fine-grained-access-tokens-for-create-or-update-a-repository-secret) specifies the repository `Secrets: write` permission for updating a repository secret. The PAT is restricted to the single cookbook repository; it does not need write access to recipe contents.
+GitHub's [Actions secrets API documentation](https://docs.github.com/en/rest/actions/secrets#fine-grained-access-tokens-for-create-or-update-a-repository-secret) specifies the repository `Secrets: write` permission for updating a repository secret. Restrict the PAT to the single cookbook repository.
 
 The workflow creates or updates each selected Markdown recipe with private visibility (`private-publish` in the API). For a recipe without a `recipeId`, it searches the account by exact title and prefers a matching locale. One match is updated; no match creates a recipe; ambiguous matches fail and require a `recipeId` link. Existing `recipeId` values are updated directly. A failed private publish is retried as a draft and fails the workflow with an error explaining the outcome. A draft fallback is only created through the workflow; recipe status is not controlled in Markdown. After a successful create or title match, the workflow opens a PR that adds or updates the `recipeId` row as a clickable Monsieur Cuisine recipe link. Merge that PR to make future runs update by ID. The details photo is the image immediately after the description; the action generates and uploads its thumbnail automatically.
