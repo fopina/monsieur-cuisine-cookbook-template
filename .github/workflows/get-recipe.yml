@@ -1,0 +1,51 @@
+name: Get recipe
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipe_url:
+        description: Monsieur Cuisine recipe URL or recipe ID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  get-recipe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - id: recipe
+        uses: fopina/monsieur-cuisine-cli@main
+        with:
+          operation: get
+          recipe: ${{ inputs.recipe_url }}
+          output: build/recipe
+          markdown_output: recipes
+          session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
+      - name: Create pull request from main
+        if: github.ref == 'refs/heads/main'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: import-recipe/${{ github.run_id }}
+          base: main
+          commit-message: Import recipe from Monsieur Cuisine
+          title: Import recipe from Monsieur Cuisine
+          body: Add the recipe fetched by the Get recipe workflow.
+      - name: Commit to selected branch
+        if: github.ref != 'refs/heads/main'
+        shell: bash
+        env:
+          RECIPE_FILE: ${{ steps.recipe.outputs.markdown-file }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$RECIPE_FILE"
+          git commit -m "Import recipe from Monsieur Cuisine"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
