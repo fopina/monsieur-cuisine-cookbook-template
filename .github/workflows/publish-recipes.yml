@@ -12,8 +12,7 @@ on:
         required: true
         default: false
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -61,5 +60,4 @@ jobs:
           operation: publish
           recipe_files: ${{ needs.changes.outputs.recipe_files }}
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
           secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}

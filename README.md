@@ -12,9 +12,11 @@ Every push and pull request validates the recipes and uploads the converted JSON
 
 Run the **Get recipe** workflow from the Actions tab and enter a Monsieur Cuisine recipe URL or numeric recipe ID. It fetches the recipe with the CLI and writes it as a Markdown file. When run on `main`, it opens a pull request; when run on another branch, it commits the new file directly to that branch. The workflow uses the `MC_API_ACCESS_TOKEN` repository secret described below.
 
-## Publish recipes
+## Recipe pull requests and publishing
 
-The **Publish recipes** workflow publishes only Markdown files changed under `recipes/` on pushes to `main`. Configure the repository Actions secrets described below before merging recipe changes. For a manual run on `main`, enable `confirm_publish` to publish every Markdown recipe under `recipes/`.
+Every recipe PR is validated. For PRs opened from a branch in this repository, **Prepare recipe drafts** creates a Monsieur Cuisine draft for each new recipe and commits its `recipeId` link to that same PR. Existing recipes with an ID are left untouched until merge. PRs from forks are validated but skip draft creation because their workflows do not receive write credentials.
+
+When the recipe PR is merged, **Publish recipes** updates the recipe by ID to private-published status. This keeps publication behind the merge and avoids a second PR just to record the recipe ID. If a PR is abandoned after draft creation, its draft may remain in the Monsieur Cuisine account. Configure the repository Actions secrets described below before using either workflow. For a manual run on `main`, enable `confirm_publish` to publish every Markdown recipe under `recipes/` (each must have a `recipeId`).
 
 ### Use a dedicated Monsieur Cuisine API token
 
@@ -30,9 +32,7 @@ By default, this saves `github-cookbook-session.json` beside the CLI config file
 
 ### GitHub Actions permissions
 
-The workflow grants the built-in `GITHUB_TOKEN` `Contents: write` and `Pull requests: write` so it can push the recipe-ID branch and open the `recipeId` pull request.
-
-For `GITHUB_TOKEN` to open pull requests, enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** in this repository. Without that repository-level setting, the workflow fails with “GitHub Actions is not permitted to create or approve pull requests,” even though `pull-requests: write` is declared.
+The draft workflow grants the built-in `GITHUB_TOKEN` `Contents: write` so it can commit the recipe ID to the existing same-repository PR branch. It does not open a new PR. The separate **Get recipe** workflow does open a PR when run on `main`, so the repository setting **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** must remain enabled for that workflow.
 
 ### Secret-writing token
 
@@ -49,4 +49,4 @@ Create a [fine-grained personal access token](https://docs.github.com/en/authent
 
 GitHub's [Actions secrets API documentation](https://docs.github.com/en/rest/actions/secrets#fine-grained-access-tokens-for-create-or-update-a-repository-secret) specifies the repository `Secrets: write` permission for updating a repository secret. Restrict the PAT to the single cookbook repository.
 
-The workflow creates or updates each selected Markdown recipe with private visibility (`private-publish` in the API). For a recipe without a `recipeId`, it searches the account by exact title and prefers a matching locale. One match is updated; no match creates a recipe; ambiguous matches fail and require a `recipeId` link. Existing `recipeId` values are updated directly. A failed private publish is retried as a draft and fails the workflow with an error explaining the outcome. A draft fallback is only created through the workflow; recipe status is not controlled in Markdown. After a successful create or title match, the workflow opens a PR that adds or updates the `recipeId` row as a clickable Monsieur Cuisine recipe link. Merge that PR to make future runs update by ID. The details photo is the image immediately after the description; the action generates and uploads its thumbnail automatically.
+On a recipe PR, the workflow creates a draft only if the Markdown has no `recipeId` and no matching account recipe exists; it then writes a clickable recipe link into the existing PR. After merge, the publish workflow updates that ID to private-publish. If private publishing fails, the action falls back to a draft and fails the workflow with an error explaining the outcome. Recipe status is managed by the action, not Markdown. The details photo is the image immediately after the description; the action generates and uploads its thumbnail automatically.
