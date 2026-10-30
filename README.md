@@ -24,14 +24,15 @@ monsieur-cuisine-cli --session-file github-cookbook-session.json auth login
 
 By default, this saves `github-cookbook-session.json` beside the CLI config file (normally `~/.config/monsieur-cuisine/`). Copy the `accessToken` value from that session file into the cookbook repository's `MC_API_ACCESS_TOKEN` Actions secret. Keep this session dedicated to GitHub Actions; do not use it for routine CLI work or manually renew it. The workflow refreshes the token and writes the rotated value back to `MC_API_ACCESS_TOKEN` after each run.
 
-### Configure GitHub tokens
+### GitHub Actions permissions
 
-The workflow uses two separate tokens for GitHub operations:
-
-- `GH_SECRETS_WRITE_TOKEN` updates the rotated `MC_API_ACCESS_TOKEN` repository secret.
-- The built-in `GITHUB_TOKEN` pushes the recipe-ID branch and opens the `recipeId` pull request. The workflow grants it `Contents: write` and `Pull requests: write`.
+The workflow grants the built-in `GITHUB_TOKEN` `Contents: write` and `Pull requests: write` so it can push the recipe-ID branch and open the `recipeId` pull request.
 
 For `GITHUB_TOKEN` to open pull requests, enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** in this repository. Without that repository-level setting, the workflow fails with “GitHub Actions is not permitted to create or approve pull requests,” even though `pull-requests: write` is declared.
+
+### Secret-writing token
+
+The workflow also needs a token with permission to update the rotated `MC_API_ACCESS_TOKEN` repository secret. It uses `GH_SECRETS_WRITE_TOKEN` for this operation.
 
 Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) for `GH_SECRETS_WRITE_TOKEN`:
 
