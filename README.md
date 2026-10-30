@@ -29,19 +29,19 @@ By default, this saves `github-cookbook-session.json` beside the CLI config file
 The workflow uses two separate tokens for GitHub operations:
 
 - `GH_SECRETS_WRITE_TOKEN` updates the rotated `MC_API_ACCESS_TOKEN` repository secret.
-- `GH_PULL_REQUESTS_TOKEN` opens the `recipeId` pull request. The workflow's `GITHUB_TOKEN` pushes its branch (using the workflow's `Contents: write` permission), but this repository does not allow that token to create pull requests.
+- The built-in `GITHUB_TOKEN` pushes the recipe-ID branch and opens the `recipeId` pull request. The workflow grants it `Contents: write` and `Pull requests: write`.
 
-The repository-level setting that controls pull requests from `GITHUB_TOKEN` is **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. When this is disabled, `GITHUB_TOKEN` cannot create PRs even when the workflow declares `pull-requests: write`; the run fails with “GitHub Actions is not permitted to create or approve pull requests.” The current workflow avoids changing that policy by using `GH_PULL_REQUESTS_TOKEN`. If you prefer to use only `GITHUB_TOKEN`, enable the setting and change the action's `github_token` input to `${{ secrets.GITHUB_TOKEN }}`; then `GH_PULL_REQUESTS_TOKEN` is not needed.
+For `GITHUB_TOKEN` to open pull requests, enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** in this repository. Without that repository-level setting, the workflow fails with “GitHub Actions is not permitted to create or approve pull requests,” even though `pull-requests: write` is declared.
 
-Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) for each token:
+Create a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) for `GH_SECRETS_WRITE_TOKEN`:
 
 1. Open [GitHub’s fine-grained token creation page](https://github.com/settings/personal-access-tokens/new) (or navigate through **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**).
 2. Select the account that owns the cookbook storage repository as **Resource owner**.
 3. Under **Repository access**, choose **Only select repositories**, then select the cookbook repository used to store the Markdown recipes.
-4. For `GH_SECRETS_WRITE_TOKEN`, set **Secrets** to **Read and write**. For `GH_PULL_REQUESTS_TOKEN`, set **Contents** and **Pull requests** to **Read and write**.
-5. Choose an expiration that fits your maintenance schedule, generate each token, and copy it.
-6. In that cookbook repository, open **Settings → Secrets and variables → Actions → New repository secret** and save each token under its corresponding name.
+4. Under **Repository permissions**, set **Secrets** to **Read and write**.
+5. Choose an expiration that fits your maintenance schedule, generate the token, and copy it.
+6. In that cookbook repository, open **Settings → Secrets and variables → Actions → New repository secret** and save it as `GH_SECRETS_WRITE_TOKEN`.
 
-GitHub's [Actions secrets API documentation](https://docs.github.com/en/rest/actions/secrets#fine-grained-access-tokens-for-create-or-update-a-repository-secret) specifies the repository `Secrets: write` permission for updating a repository secret. The action documents `Contents: write` and `Pull requests: write` for its `github_token` input, which is used to open the `recipeId` pull request. Restrict both tokens to the single cookbook repository.
+GitHub's [Actions secrets API documentation](https://docs.github.com/en/rest/actions/secrets#fine-grained-access-tokens-for-create-or-update-a-repository-secret) specifies the repository `Secrets: write` permission for updating a repository secret. Restrict the PAT to the single cookbook repository.
 
 The workflow creates or updates every Markdown recipe with private visibility (`private-publish` in the API). For a recipe without a `recipeId`, it searches the account by exact title and prefers a matching locale. One match is updated; no match creates a recipe; ambiguous matches fail and require a `recipeId` link. Existing `recipeId` values are updated directly. A failed private publish is retried as a draft and fails the workflow with an error explaining the outcome. A draft fallback is only created through the workflow; recipe status is not controlled in Markdown. After a successful create or title match, the workflow opens a PR that adds or updates the `recipeId` row as a clickable Monsieur Cuisine recipe link. Merge that PR to make future runs update by ID. The details photo is the image immediately after the description; the action generates and uploads its thumbnail automatically.
