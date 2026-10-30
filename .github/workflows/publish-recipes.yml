@@ -20,7 +20,7 @@ jobs:
       recipe_files: ${{ steps.changed.outputs.recipe_files }}
       has_recipes: ${{ steps.changed.outputs.has_recipes }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - id: changed
@@ -54,7 +54,7 @@ jobs:
     if: needs.changes.outputs.has_recipes == 'true' && (github.event_name == 'push' || (github.ref == 'refs/heads/main' && inputs.confirm_publish))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: fopina/monsieur-cuisine-cli@main
         with:
           operation: publish
