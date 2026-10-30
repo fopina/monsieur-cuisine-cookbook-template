@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: fopina-ci/monsieur-cuisine-cli@feature/draft-recipe-ids
+      - uses: fopina/monsieur-cuisine-cli@main
         with:
           operation: publish
           recipe_files: ${{ needs.changes.outputs.recipe_files }}

@@ -25,7 +25,7 @@ jobs:
           files="$(git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" -- ':(glob)recipes/**/*.md' | python -c 'import json,sys; print(json.dumps([p for p in sys.stdin.buffer.read().decode().split("\0") if p.lower().endswith(".md")]))')"
           echo "recipe_files=$files" >> "$GITHUB_OUTPUT"
       - if: ${{ steps.changed.outputs.recipe_files != '[]' }}
-        uses: fopina-ci/monsieur-cuisine-cli@feature/draft-recipe-ids
+        uses: fopina/monsieur-cuisine-cli@main
         with:
           operation: draft
           recipe_files: ${{ steps.changed.outputs.recipe_files }}
