@@ -22,5 +22,5 @@ jobs:
         with:
           operation: publish
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
           secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
