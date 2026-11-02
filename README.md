@@ -4,7 +4,15 @@ A version-controlled recipe collection in Markdown. Recipes are readable here on
 
 ## Add a recipe
 
-Create a Markdown file under `recipes/`. Use the first-level heading as its title, put the description immediately below it, then add the details photo as the next image. The action uploads that photo as the details image and creates an 800×600 thumbnail from a top-left 4:3 crop. When the source is smaller, it uses the largest 4:3 crop available without enlarging it. Store other recipe metadata in a Markdown table under `## Recipe`, followed by `## Ingredients` and `## Steps`. See [Tomato soup](recipes/tomato-soup.md) and the [action format guide](https://github.com/fopina/monsieur-cuisine-cli/tree/github-action-cookbook/action#recipe-format).
+Create a Markdown file under `recipes/`. Use the first-level heading as its title, put the description immediately below it, then add the details photo as the next image. The action uploads that photo as the details image and creates an 800×600 thumbnail from a top-left 4:3 crop. When the source is smaller, it uses the largest 4:3 crop available without enlarging it. Store other recipe metadata in a Markdown table under `## Recipe`, followed by `## Ingredients` and `## Steps`. See [Tomato soup](recipes/tomato-soup.md), the [Portuguese example](recipes/sopa-de-tomate.md), and the [action format guide](https://github.com/fopina/monsieur-cuisine-cli/tree/main/action#recipe-format).
+
+## Language support and translations
+
+Set `languageLocale` in the `Recipe` table to the recipe's locale. The supported locale codes are maintained in the [CLI locale reference](https://github.com/fopina/monsieur-cuisine-cli/blob/main/monsieur_cuisine_cli/locales.py); recipe dropdown values such as device, difficulty, category, serving unit, and ingredient unit are validated against the selected locale. The Portuguese example uses the localized table labels and values (`Idioma`, `Tipo de aparelho`, `Doses`, `Dificuldade`, and `fácil`) to show that fields and dropdowns can be written in Portuguese. The CLI property names (such as `languageLocale` and `complexityId`) remain accepted in any locale.
+
+Keep each language version in its own Markdown file, with its own localized title, description, ingredients, steps, and `languageLocale`. Each locale-specific recipe is a separate account recipe and receives its own `recipeId`; do not copy the ID from another language version. During PR draft preparation, the action matches an existing recipe by exact title and locale. If a translated title does not match an existing recipe, the action creates a draft and records its ID in that file. To update an existing translation, include that translation's own `recipeId`.
+
+Recipes created by this repository's workflow are **private**: publishing uses the API's `private-publish` status, and the workflow has no public-visibility option. A recipe that should be public must be made public separately through Monsieur Cuisine; merging a cookbook PR will not make it public.
 
 Every push and pull request validates the recipes and uploads the converted JSON as a workflow artifact. Generated payloads use the API’s `status: private-publish` for private recipes. Review them before using the CLI to create recipes in your account.
 
