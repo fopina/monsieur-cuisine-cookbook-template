@@ -29,7 +29,7 @@ jobs:
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
       - name: Create pull request from main
         if: github.ref == 'refs/heads/main'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: import-recipe/${{ github.run_id }}
