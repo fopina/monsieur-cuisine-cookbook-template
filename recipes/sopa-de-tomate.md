@@ -16,6 +16,7 @@ Uma sopa simples de tomate e manjericão, ideal para um almoço leve.
 | Tempo de preparação | 10 |
 | Tempo total | 35 |
 | Categorias | Sopas & guisados |
+| recipeId | [https://www.monsieur-cuisine.com/pt-pt/previsao-da-receita?recipe-id=10444509](https://www.monsieur-cuisine.com/pt-pt/previsao-da-receita?recipe-id=10444509) |
 
 ## Ingredients
 
