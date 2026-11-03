@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.ref }}
       - id: recipe
         uses: fopina/monsieur-cuisine-cli@main
         with:
