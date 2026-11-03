@@ -25,6 +25,7 @@ jobs:
           output: build/recipe
           markdown_output: recipes
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
+          secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
       - name: Create pull request from main
         if: github.ref == 'refs/heads/main'
         uses: peter-evans/create-pull-request@v8
