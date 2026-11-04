@@ -14,11 +14,11 @@ Keep each language version in its own Markdown file, with its own localized titl
 
 Recipes created by this repository's workflow are **private**: publishing uses the API's `private-publish` status, and the workflow has no public-visibility option. A recipe that should be public must be made public separately through Monsieur Cuisine; merging a cookbook PR will not make it public.
 
-Every push and pull request validates the recipes and uploads the converted JSON as a workflow artifact. Generated payloads use the API’s `status: private-publish` for private recipes. Review them before using the CLI to create recipes in your account.
+Every push and pull request validates the recipes and uploads the converted JSON as a workflow artifact. The **Get recipe** workflow also uploads both the original JSON fetched from the site and the converted Markdown JSON when conversion succeeds. Generated payloads use the API’s `status: private-publish` for private recipes. Review them before using the CLI to create recipes in your account.
 
 ## Fetch a recipe
 
-Run the **Get recipe** workflow from the Actions tab and enter a Monsieur Cuisine recipe URL or numeric recipe ID. It fetches the recipe with the CLI and writes it as a Markdown file. When run on `main`, it opens a pull request; when run on another branch, it commits the new file directly to that branch. The workflow uses the `MC_API_ACCESS_TOKEN` repository secret described below.
+Run the **Get recipe** workflow from the Actions tab and enter a Monsieur Cuisine recipe URL or numeric recipe ID. It fetches the recipe with the CLI, converts the generated Markdown back to JSON before opening a pull request, and compares the result to the fetched JSON. The PR links to the workflow run and reports conversion errors, a warning when the JSON differs, or a check when they match. A conversion failure is recorded in the PR rather than preventing the recipe Markdown from being reviewed. When run on another branch, it commits the new Markdown and details image directly to that branch. The workflow uses the `MC_API_ACCESS_TOKEN` repository secret described below.
 
 ## Recipe pull requests and publishing
 

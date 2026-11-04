@@ -26,6 +26,35 @@ jobs:
           markdown_output: recipes
           session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
           secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
+      - name: Upload fetched recipe JSON
+        uses: actions/upload-artifact@v7
+        with:
+          name: fetched-recipe-json-${{ github.run_id }}
+          path: build/recipe/recipe.json
+          if-no-files-found: error
+      - id: convert
+        name: Convert imported Markdown to JSON
+        uses: fopina/monsieur-cuisine-cli@main
+        with:
+          operation: validate
+          recipe_files: '["${{ steps.recipe.outputs.markdown-file }}"]'
+          output: build/converted
+          capture_validation: true
+      - id: compare
+        name: Compare fetched and Markdown-converted JSON
+        if: steps.convert.outputs.validation-success == 'true'
+        uses: fopina/monsieur-cuisine-cli@main
+        with:
+          operation: compare
+          compare_source: build/recipe/recipe.json
+          compare_target: ${{ fromJSON(steps.convert.outputs.converted-json-files)[0] }}
+      - name: Upload Markdown-converted recipe JSON
+        if: steps.convert.outputs.validation-success == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: converted-recipe-json-${{ github.run_id }}
+          path: build/converted/*.json
+          if-no-files-found: error
       - name: Create pull request from main
         if: github.ref == 'refs/heads/main'
         uses: peter-evans/create-pull-request@v8
@@ -34,17 +63,37 @@ jobs:
           branch: import-recipe/${{ github.run_id }}
           base: main
           commit-message: Import recipe from Monsieur Cuisine
-          title: Import recipe from Monsieur Cuisine
-          body: Add the recipe fetched by the Get recipe workflow.
+          title: "Import Recipe: ${{ steps.recipe.outputs.recipe-title }}"
+          body: |
+            Add the recipe fetched by the Get recipe workflow.
+
+            Source: ${{ steps.recipe.outputs.recipe-url }}
+
+            ${{ steps.convert.outputs.validation-success != 'true' && '❌' || (steps.compare.outputs.recipes-equal == 'true' && '✅' || '⚠️') }} [Get recipe workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Markdown-to-JSON conversion: ${{ steps.convert.outputs.validation-success == 'true' && '✅ succeeded' || '❌ failed' }}
+            JSON comparison: ${{ steps.convert.outputs.validation-success != 'true' && 'skipped because conversion failed' || steps.compare.outputs.comparison-report }}
+
+            Conversion output:
+            ```
+            ${{ steps.convert.outputs.validation-report }}
+            ```
+          add-paths: |
+            ${{ steps.recipe.outputs.markdown-file }}
+            ${{ steps.recipe.outputs.details-image-file }}
       - name: Commit to selected branch
         if: github.ref != 'refs/heads/main'
         shell: bash
         env:
           RECIPE_FILE: ${{ steps.recipe.outputs.markdown-file }}
+          DETAILS_IMAGE_FILE: ${{ steps.recipe.outputs.details-image-file }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- "$RECIPE_FILE"
+          if [[ -n "$DETAILS_IMAGE_FILE" ]]; then
+            git add -- "$DETAILS_IMAGE_FILE"
+          fi
           git commit -m "Import recipe from Monsieur Cuisine"
           git push origin "HEAD:${GITHUB_REF_NAME}"

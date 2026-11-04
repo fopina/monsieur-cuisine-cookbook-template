@@ -12,7 +12,7 @@ jobs:
         id: cookbook
         with:
           operation: validate
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: recipe-json
           path: ${{ steps.cookbook.outputs.output-directory }}
