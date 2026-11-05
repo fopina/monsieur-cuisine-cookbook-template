@@ -1,0 +1,82 @@
+name: Refresh private recipe
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipe_id:
+        description: Existing recipe ID already present in the cookbook
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh-recipe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Validate recipe ID
+        shell: bash
+        env:
+          RECIPE_ID: ${{ inputs.recipe_id }}
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          if [[ "$WORKFLOW_REF" != 'refs/heads/main' ]]; then
+            echo 'Run this workflow from main so it can refresh the canonical cookbook entry.' >&2
+            exit 1
+          fi
+          if [[ ! "$RECIPE_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'recipe_id must be a positive numeric recipe ID.' >&2
+            exit 1
+          fi
+
+      - id: get
+        name: Fetch private recipe with recipes get
+        uses: fopina/monsieur-cuisine-cli@main
+        with:
+          operation: get
+          recipe: ${{ inputs.recipe_id }}
+          output: build/refreshed-recipe
+          markdown_output: build/refreshed-markdown
+          session_token: ${{ secrets.MC_API_ACCESS_TOKEN }}
+          secrets_write_token: ${{ secrets.GH_SECRETS_WRITE_TOKEN }}
+
+      - id: replace
+        name: Update the existing cookbook entry
+        shell: bash
+        env:
+          RECIPE_ID: ${{ inputs.recipe_id }}
+          GENERATED_MARKDOWN: ${{ steps.get.outputs.markdown-file }}
+          GENERATED_IMAGE: ${{ steps.get.outputs.details-image-file }}
+        run: python3 .github/scripts/refresh_private_recipe.py
+
+      - id: validate
+        name: Validate refreshed recipe
+        uses: fopina/monsieur-cuisine-cli@main
+        with:
+          operation: validate
+          recipe_files: '["${{ steps.replace.outputs.recipe-file }}"]'
+          output: build/validated-refreshed-recipe
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: refresh-recipe/${{ inputs.recipe_id }}-${{ github.run_id }}
+          base: main
+          commit-message: "Refresh recipe ${{ inputs.recipe_id }} from Monsieur Cuisine"
+          title: "Refresh recipe: ${{ steps.get.outputs.recipe-title }}"
+          body: |
+            Refresh the existing cookbook entry for recipe `${{ inputs.recipe_id }}` from the authenticated Monsieur Cuisine account using `recipes get`.
+
+            The refreshed Markdown was validated before opening this PR.
+
+            [Workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          add-paths: |
+            ${{ steps.replace.outputs.recipe-file }}
+            ${{ steps.replace.outputs.image-file }}

@@ -37,4 +37,6 @@ The demos are separate recipes in different locales: [Tomato soup (`en-US`)](rec
 
 Run **Get recipe** from the Actions tab and enter a Monsieur Cuisine URL or numeric recipe ID. It creates a Markdown file and a pull request on `main`. The workflow also converts the Markdown back to JSON, compares it with the fetched recipe, and attaches the JSON artifacts to the run. See the Action guide for [operation details](https://github.com/fopina/monsieur-cuisine-cli/blob/main/action/README.md#use-in-a-cookbook-repository).
 
+To refresh a recipe already in this cookbook, run **Refresh private recipe** from the Actions tab on `main` and enter its `recipeId`. It fetches the authenticated recipe with the same CLI `get` operation, replaces the existing Markdown entry and details image in place, validates the refreshed recipe, and opens a pull request. It refuses to run from another branch or if the ID does not match exactly one cookbook recipe. It uses the same `MC_API_ACCESS_TOKEN` and `GH_SECRETS_WRITE_TOKEN` secrets as the other authenticated workflows.
+
 Recipes created by this workflow are private. To make one public, change its visibility separately in Monsieur Cuisine; merging a cookbook pull request does not make it public.
