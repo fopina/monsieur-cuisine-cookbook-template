@@ -3,6 +3,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    # GitHub Actions schedules use UTC; run weekly on Mondays at 06:00.
+    - cron: '0 6 * * 1'
 jobs:
   recipes:
     runs-on: ubuntu-latest
